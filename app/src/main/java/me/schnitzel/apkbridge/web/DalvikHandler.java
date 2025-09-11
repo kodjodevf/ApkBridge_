@@ -125,7 +125,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
             case "headersManga":
                 return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> {
                     if (catalogueSource instanceof HttpSource) {
-                        return ((HttpSource) catalogueSource).getHeaders().getNamesAndValues$okhttp();
+                        return ((HttpSource) catalogueSource).getHeaders().getNamesAndValues$okhttp_release();
                     }
                     return List.of();
                 }), mapper);
@@ -173,7 +173,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
             case "headersAnime":
                 return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> {
                     if (animeCatalogueSource instanceof AnimeHttpSource) {
-                        return ((AnimeHttpSource) animeCatalogueSource).getHeaders().getNamesAndValues$okhttp();
+                        return ((AnimeHttpSource) animeCatalogueSource).getHeaders().getNamesAndValues$okhttp_release();
                     }
                     return List.of();
                 }), mapper);
