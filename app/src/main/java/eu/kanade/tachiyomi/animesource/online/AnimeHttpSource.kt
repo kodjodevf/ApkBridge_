@@ -8,7 +8,6 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
-import eu.kanade.tachiyomi.network.NetworkHelper.Companion.defaultUserAgentProvider
 import eu.kanade.tachiyomi.network.ProgressListener
 import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.awaitSuccess
@@ -32,7 +31,7 @@ abstract class AnimeHttpSource : AnimeCatalogueSource {
     /**
      * Network service.
      */
-    protected val network: NetworkHelper by injectLazy()
+    val network: NetworkHelper by injectLazy()
 
     /**
      * Base url of the website without the trailing slash, like: http://mysite.com
@@ -96,7 +95,7 @@ abstract class AnimeHttpSource : AnimeCatalogueSource {
      * Headers builder for requests. Implementations can override this method for custom headers.
      */
     protected open fun headersBuilder() = Headers.Builder().apply {
-        add("User-Agent", defaultUserAgentProvider())
+        add("User-Agent", network.defaultUserAgentProvider())
     }
 
     /**

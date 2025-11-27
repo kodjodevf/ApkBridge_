@@ -46,6 +46,7 @@ import eu.kanade.tachiyomi.animesource.model.AnimeFilterList;
 import eu.kanade.tachiyomi.animesource.model.Track;
 import eu.kanade.tachiyomi.animesource.model.Video;
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource;
+import eu.kanade.tachiyomi.network.NetworkHelper;
 import eu.kanade.tachiyomi.source.CatalogueSource;
 import eu.kanade.tachiyomi.source.ConfigurableSource;
 import eu.kanade.tachiyomi.source.MangaSource;
@@ -103,7 +104,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                 }
                 file.setReadOnly();
                 DexClassLoader loader = load(file);
-                try (NanoHTTPD.Response response = resolve(loader, file, data, mapper)) {
+                try (NanoHTTPD.Response response = resolve(loader, file, data, mapper, session)) {
                     return response;
                 } finally {
                     file.delete();
@@ -121,7 +122,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
         return newFixedLengthResponse(NanoHTTPD.Response.Status.NOT_FOUND, MIME_PLAINTEXT, "");
     }
 
-    protected NanoHTTPD.Response resolve(DexClassLoader classLoader, File file, DataBody data, ObjectMapper mapper) throws InterruptedException {
+    protected NanoHTTPD.Response resolve(DexClassLoader classLoader, File file, DataBody data, ObjectMapper mapper, NanoHTTPD.IHTTPSession session) throws InterruptedException {
         switch (data.method) {
             case "headersManga":
                 return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> {
@@ -129,33 +130,33 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                         return ((HttpSource) catalogueSource).getHeaders().getNamesAndValues$okhttp_release();
                     }
                     return List.of();
-                },false), mapper);
+                },false, session), mapper);
             case "filtersManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getFilterList(),false), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getFilterList(),false, session), mapper);
             case "supportLatestManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getSupportsLatest(),false), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getSupportsLatest(),false, session), mapper);
             case "getPopularManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPopularManga(data.page, continuation),false), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPopularManga(data.page, continuation),false, session), mapper);
             case "getLatestManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getLatestUpdates(data.page, continuation),false), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getLatestUpdates(data.page, continuation),false, session), mapper);
             case "getSearchManga":
                 return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> {
                     FilterList filterList = data.filterList != null ? convertFilterListManga(catalogueSource.getFilterList(), data.filterList) : catalogueSource.getFilterList();
                     return catalogueSource.getSearchManga(data.page, data.search, filterList, continuation);
-                },false), mapper);
+                },false, session), mapper);
             case "getDetailsManga":
                 if (data.mangaData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getMangaDetails(data.mangaData, continuation),false), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getMangaDetails(data.mangaData, continuation),false, session), mapper);
                 }
                 break;
             case "getChapterList":
                 if (data.mangaData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getChapterList(data.mangaData, continuation),false), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getChapterList(data.mangaData, continuation),false, session), mapper);
                 }
                 break;
             case "getPageList":
                 if (data.chapterData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPageList(data.chapterData, continuation),true), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPageList(data.chapterData, continuation),true, session), mapper);
                 }
                 break;
             case "preferencesManga":
@@ -170,40 +171,40 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                         return preferences;
                     }
                     return Map.of();
-                },false), mapper);
+                },false, session), mapper);
             case "headersAnime":
                 return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> {
                     if (animeCatalogueSource instanceof AnimeHttpSource) {
                         return ((AnimeHttpSource) animeCatalogueSource).getHeaders().getNamesAndValues$okhttp_release();
                     }
                     return List.of();
-                }), mapper);
+                }, session), mapper);
             case "filtersAnime":
-                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getFilterList()), mapper);
+                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getFilterList(), session), mapper);
             case "supportLatestAnime":
-                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getSupportsLatest()), mapper);
+                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getSupportsLatest(), session), mapper);
             case "getPopularAnime":
-                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getPopularAnime(data.page, continuation)), mapper);
+                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getPopularAnime(data.page, continuation), session), mapper);
             case "getLatestAnime":
-                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getLatestUpdates(data.page, continuation)), mapper);
+                return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getLatestUpdates(data.page, continuation), session), mapper);
             case "getSearchAnime":
                 return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> {
                     AnimeFilterList animeFilterList = data.filterList != null ? convertFilterListAnime(animeCatalogueSource.getFilterList(), data.filterList) : animeCatalogueSource.getFilterList();
                     return animeCatalogueSource.getSearchAnime(data.page, data.search, animeFilterList, continuation);
-                }), mapper);
+                }, session), mapper);
             case "getDetailsAnime":
                 if (data.animeData != null) {
-                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getAnimeDetails(data.animeData, continuation)), mapper);
+                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getAnimeDetails(data.animeData, continuation), session), mapper);
                 }
                 break;
             case "getEpisodeList":
                 if (data.animeData != null) {
-                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getEpisodeList(data.animeData, continuation)), mapper);
+                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getEpisodeList(data.animeData, continuation), session), mapper);
                 }
                 break;
             case "getVideoList":
                 if (data.episodeData != null) {
-                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getVideoList(data.episodeData, continuation)), mapper);
+                    return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> animeCatalogueSource.getVideoList(data.episodeData, continuation), session), mapper);
                 }
                 break;
             case "preferencesAnime":
@@ -218,7 +219,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                         return preferences;
                     }
                     return Map.of();
-                }), mapper);
+                }, session), mapper);
         }
         return newFixedLengthResponse(NanoHTTPD.Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "");
     }
@@ -235,7 +236,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
         }).orElse(newFixedLengthResponse(NanoHTTPD.Response.Status.BAD_REQUEST, MIME_PLAINTEXT, ""));
     }
 
-    protected <T> Optional<T> invokeMangaSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<CatalogueSource, Continuation<? super T>, ?> callback,boolean isGetPageList) {
+    protected <T> Optional<T> invokeMangaSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<CatalogueSource, Continuation<? super T>, ?> callback,boolean isGetPageList, NanoHTTPD.IHTTPSession session) {
         if (pm == null) {
             return Optional.empty();
         }
@@ -272,6 +273,25 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                 T result;
                 try {
                     applyPreferences(data, src.getId());
+
+                    String domain = null;
+                    try {
+                        java.lang.reflect.Method method = src.getClass().getMethod("getBaseUrl");
+                        String baseUrl = (String) method.invoke(src);
+                        domain = java.net.URI.create(baseUrl).getHost();
+                    } catch (Exception ignored) {
+                    }
+                    if(domain!=null){
+                        NetworkHelper network = null;
+                        if (src instanceof HttpSource) {
+                            network = ((HttpSource) src).getNetwork();
+                        }
+
+                        if (network != null) {
+                            setClientCookie(network,domain,session);
+                        }
+                    }
+
                     result = BuildersKt.runBlocking(EmptyCoroutineContext.INSTANCE, (scope, continuation) -> {
                         if(isGetPageList){
                             List<Page> pages = (List<Page>) callback.apply(src, continuation);
@@ -295,7 +315,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
         return Optional.empty();
     }
 
-    protected <T> Optional<T> invokeAnimeSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<AnimeCatalogueSource, Continuation<? super T>, ?> callback) {
+    protected <T> Optional<T> invokeAnimeSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<AnimeCatalogueSource, Continuation<? super T>, ?> callback, NanoHTTPD.IHTTPSession session) {
         if (pm == null) {
             return Optional.empty();
         }
@@ -331,6 +351,25 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                 T result;
                 try {
                     applyPreferences(data, src.getId());
+
+                    String domain = null;
+                    try {
+                        java.lang.reflect.Method method = src.getClass().getMethod("getBaseUrl");
+                        String baseUrl = (String) method.invoke(src);
+                        domain = java.net.URI.create(baseUrl).getHost();
+                    } catch (Exception ignored) {
+                    }
+                    if(domain!=null){
+                        NetworkHelper network = null;
+                        if (src instanceof AnimeHttpSource) {
+                            network = ((AnimeHttpSource) src).getNetwork();
+                        }
+
+                        if (network != null) {
+                            setClientCookie(network,domain,session);
+                        }
+                    }
+
                     result = BuildersKt.runBlocking(EmptyCoroutineContext.INSTANCE, (scope, continuation) -> callback.apply(src, continuation));
                     fixSubtitles(result);
                 } catch (InterruptedException e) {
@@ -503,6 +542,43 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
             if (!editor.commit()) {
                 Log.e("DalvikHandler", "Unable to apply prefs for id: " + sourceId);
             }
+        }
+    }
+
+    private void setClientCookie(NetworkHelper network,String domain, NanoHTTPD.IHTTPSession session) {
+        Map<String, String> headersMap = session.getHeaders();
+        String cookieHeader = headersMap.get("cookie");
+        if (cookieHeader == null) cookieHeader = headersMap.get("Cookie");
+        List<okhttp3.Cookie> cookies = null;
+        if (cookieHeader != null) {
+            cookies = Arrays.stream(cookieHeader.split(";"))
+                    .map(cookieStr -> {
+                        String trimmed = cookieStr.trim();
+                        String[] parts = trimmed.split("=", 2);
+                        String name = parts[0].trim();
+                        String value = parts.length > 1 ? parts[1].trim() : "";
+                        return new okhttp3.Cookie.Builder()
+                                .name(name)
+                                .value(value)
+                                .domain(domain.startsWith(".") ? domain.substring(1) : domain)
+                                .path("/")
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        if (cookies != null) {
+            okhttp3.HttpUrl url = new okhttp3.HttpUrl.Builder()
+                    .scheme("http")
+                    .host(domain.startsWith(".") ? domain.substring(1) : domain)
+                    .build();
+            network.getCookieJar().addAll(url, cookies);
+        }
+
+        String ua = headersMap.get("user-agent");
+        if (ua == null) ua = headersMap.get("User-Agent");
+        if (ua != null) {
+            network.setUA(ua);
         }
     }
 

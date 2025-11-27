@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 class NetworkHelper(
     context: Context
 ) {
-    val cookieJar = AndroidCookieJar()
+    val cookieJar = MemoryCookieJar()
     val client: OkHttpClient = run {
         val builder = OkHttpClient.Builder()
             .cookieJar(cookieJar)
@@ -41,7 +41,11 @@ class NetworkHelper(
     val cloudflareClient: OkHttpClient = client
 
 
-    companion object {
-        fun defaultUserAgentProvider() = "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+    private var defaultUserAgent: String = "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+
+    fun setUA(ua: String) {
+        defaultUserAgent = ua
     }
+
+    fun defaultUserAgentProvider() = defaultUserAgent
 }
