@@ -30,7 +30,7 @@ abstract class HttpSource : CatalogueSource {
     /**
      * Network service.
      */
-    protected val network: NetworkHelper by injectLazy()
+    val network: NetworkHelper by injectLazy()
 
     /**
      * Base url of the website without the trailing slash, like: http://mysite.com
@@ -333,7 +333,7 @@ abstract class HttpSource : CatalogueSource {
      *
      * @param page the chapter whose page list has to be fetched
      */
-    protected open fun imageRequest(page: Page): Request {
+     open fun imageRequest(page: Page): Request {
         return GET(page.imageUrl!!, headers)
     }
 

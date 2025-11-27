@@ -52,6 +52,7 @@ import eu.kanade.tachiyomi.source.MangaSource;
 import eu.kanade.tachiyomi.source.SourceFactory;
 import eu.kanade.tachiyomi.source.model.Filter;
 import eu.kanade.tachiyomi.source.model.FilterList;
+import eu.kanade.tachiyomi.source.model.Page;
 import eu.kanade.tachiyomi.source.online.HttpSource;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.router.RouterNanoHTTPD;
@@ -128,33 +129,33 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                         return ((HttpSource) catalogueSource).getHeaders().getNamesAndValues$okhttp_release();
                     }
                     return List.of();
-                }), mapper);
+                },false), mapper);
             case "filtersManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getFilterList()), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getFilterList(),false), mapper);
             case "supportLatestManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getSupportsLatest()), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getSupportsLatest(),false), mapper);
             case "getPopularManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPopularManga(data.page, continuation)), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPopularManga(data.page, continuation),false), mapper);
             case "getLatestManga":
-                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getLatestUpdates(data.page, continuation)), mapper);
+                return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getLatestUpdates(data.page, continuation),false), mapper);
             case "getSearchManga":
                 return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> {
                     FilterList filterList = data.filterList != null ? convertFilterListManga(catalogueSource.getFilterList(), data.filterList) : catalogueSource.getFilterList();
                     return catalogueSource.getSearchManga(data.page, data.search, filterList, continuation);
-                }), mapper);
+                },false), mapper);
             case "getDetailsManga":
                 if (data.mangaData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getMangaDetails(data.mangaData, continuation)), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getMangaDetails(data.mangaData, continuation),false), mapper);
                 }
                 break;
             case "getChapterList":
                 if (data.mangaData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getChapterList(data.mangaData, continuation)), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getChapterList(data.mangaData, continuation),false), mapper);
                 }
                 break;
             case "getPageList":
                 if (data.chapterData != null) {
-                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPageList(data.chapterData, continuation)), mapper);
+                    return buildResponse(invokeMangaSource(classLoader, file, data, (catalogueSource, continuation) -> catalogueSource.getPageList(data.chapterData, continuation),true), mapper);
                 }
                 break;
             case "preferencesManga":
@@ -169,7 +170,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                         return preferences;
                     }
                     return Map.of();
-                }), mapper);
+                },false), mapper);
             case "headersAnime":
                 return buildResponse(invokeAnimeSource(classLoader, file, data, (animeCatalogueSource, continuation) -> {
                     if (animeCatalogueSource instanceof AnimeHttpSource) {
@@ -234,7 +235,7 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
         }).orElse(newFixedLengthResponse(NanoHTTPD.Response.Status.BAD_REQUEST, MIME_PLAINTEXT, ""));
     }
 
-    protected <T> Optional<T> invokeMangaSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<CatalogueSource, Continuation<? super T>, ?> callback) {
+    protected <T> Optional<T> invokeMangaSource(DexClassLoader classLoader, File file, DataBody data, BiFunction<CatalogueSource, Continuation<? super T>, ?> callback,boolean isGetPageList) {
         if (pm == null) {
             return Optional.empty();
         }
@@ -271,7 +272,20 @@ public class DalvikHandler extends RouterNanoHTTPD.GeneralHandler {
                 T result;
                 try {
                     applyPreferences(data, src.getId());
-                    result = BuildersKt.runBlocking(EmptyCoroutineContext.INSTANCE, (scope, continuation) -> callback.apply(src, continuation));
+                    result = BuildersKt.runBlocking(EmptyCoroutineContext.INSTANCE, (scope, continuation) -> {
+                        if(isGetPageList){
+                            List<Page> pages = (List<Page>) callback.apply(src, continuation);
+                            if (src instanceof HttpSource) {
+                                HttpSource httpSource = (HttpSource) src;
+                                assert pages != null;
+                                for (Page page : pages) {
+                                    page.setImageUrl(httpSource.imageRequest(page).url().toString());
+                                }
+                            }
+                            return pages;
+                        }
+                        return callback.apply(src, continuation);
+                    });
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
